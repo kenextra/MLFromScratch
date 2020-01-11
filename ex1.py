@@ -4,7 +4,6 @@ import pandas as pd
 import argparse
 import matplotlib.pyplot as plt
 from utils import plot_data, feature_normalize, predict, train
-from mpl_toolkits import mplot3d
 
 ap = argparse.ArgumentParser()
 ap.add_argument("-f", "--file", required=True,
