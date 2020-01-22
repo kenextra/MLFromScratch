@@ -131,10 +131,10 @@ def cost_function_nn(nn_params, X, y, input_layer_size, hidden_layer_size, num_l
     a = OneHotEncoder(categories='auto', dtype='int32')
     y_matrix = a.fit_transform(y).todense()
 
-    mul = -1/m
+    mul = -1 / m
 
     y_logh = np.trace(y_matrix.T.dot(np.log(all_h)))
-    y_minus_logh = np.trace((1-y_matrix).T.dot(np.log(1-all_h)))
+    y_minus_logh = np.trace((1 - y_matrix).T.dot(np.log(1 - all_h)))
 
     theta_1 = theta1[:, 1:]
     theta_1 = np.trace(theta_1.T.dot(theta_1))
@@ -143,7 +143,7 @@ def cost_function_nn(nn_params, X, y, input_layer_size, hidden_layer_size, num_l
 
     all_logh = y_logh + y_minus_logh
 
-    J = mul * all_logh + (lambd/(2*m) * (theta_1 + theta_2))
+    J = mul * all_logh + (lambd / (2 * m) * (theta_1 + theta_2))
 
     return J.flatten()[0]
 
@@ -199,12 +199,12 @@ def gradient_nn(nn_params, X, y, input_layer_size, hidden_layer_size, num_labels
 
     # Regularization with the cost function and gradients
     # Do not regularize the first column
-    theta1_grad[:, 0] = (1/m) * delta1[:, 0].T
-    theta1_grad[:, 1:] = 1/m * (delta1[:, 1:] + lambd * theta1[:, 1:])
+    theta1_grad[:, 0] = (1 / m) * delta1[:, 0].T
+    theta1_grad[:, 1:] = 1 / m * (delta1[:, 1:] + lambd * theta1[:, 1:])
 
     # Do not regularize the first column
-    theta2_grad[:, 0] = 1/m * delta2[:, 0].T
-    theta2_grad[:, 1:] = 1/m * (delta2[:, 1:] + lambd * theta2[:, 1:])
+    theta2_grad[:, 0] = 1 / m * delta2[:, 0].T
+    theta2_grad[:, 1:] = 1 / m * (delta2[:, 1:] + lambd * theta2[:, 1:])
 
     # Unroll gradients
     grad1 = np.reshape(theta1_grad, (-1, 1), order='F')
@@ -264,7 +264,7 @@ def display_data(data, width=None):
 
     pad = 1
     # set up blank display
-    array = -np.ones((pad + int(rows*(height+pad)), pad + int(cols *(width+pad))), order='F')
+    array = -np.ones((pad + int(rows * (height + pad)), pad + int(cols * (width + pad))), order='F')
     current = 0
     for j in range(rows):
         for i in range(cols):
@@ -306,3 +306,85 @@ def rand_initialize_weights(lin, lout):
     w = np.reshape(w, (lout, 1 + lin), order='F')
 
     return w
+
+
+# Leguralized Linear Regression utils
+def linearReg_cost_function(theta, X, y, lambd=0):
+    m, n = X.shape
+    y = y.reshape(m, 1)
+    assert(m == y.shape[0])
+    theta = theta.reshape(n, 1)
+    theta_above = theta[1:, :]
+    h = X.dot(theta)
+    error = h - y
+    mul = -1 / m
+    lambd_mul = lambd / (2 * m)
+
+    J = (error.T.dot(error)) / (2 * m) + (lambd_mul * theta_above.T.dot(theta_above))
+    return J.flatten()[0]
+
+
+def linearReg_gradient(theta, X, y, lambd=0):
+    m, n = X.shape
+    y = y.reshape(m, 1)
+    assert(m == y.shape[0])
+    theta = theta.reshape(n, 1)
+    grad = np.zeros(theta.shape)
+
+    theta_above = theta[1:, :]
+    h = X.dot(theta)
+    error = h - y
+    mul = -1 / m
+    lambd_mul = lambd / (2 * m)
+
+    grad[:, 0] = (1 / m) * (X[:, 0].T.dot(h - y))
+    grad[1:, :] = (1 / m) * (X[:, 1:].T.dot(h - y)) + ((lambd / m) * theta_above)
+    return np.reshape(grad, (-1, 1), order='F')
+
+
+def train_linearReg(X, y, lambd):
+    # X = np.insert(X, 0, 1, axis=1)
+    m, n = X.shape
+    initial_theta = np.zeros(n)
+    options = {'maxiter': 200, 'disp': False}
+    result = op.minimize(fun=linearReg_cost_function,
+                         x0=initial_theta,
+                         args=(X, y, lambd),
+                         method='TNC',
+                         jac=linearReg_gradient,
+                         options=options)
+    theta = result.x
+    return theta
+
+
+def learning_curve(X, y, Xval, yval, lambd):
+    m, n = X.shape
+    train_error = np.zeros((m, 1))
+    val_error = np.zeros((m, 1))
+    # Compute train/cross validation errors using training examples
+    for i in range(m):
+        X_train = X[0:i + 1, :].reshape(i + 1, -1)
+        y_train = y[0:i + 1, :].reshape(-1, 1)
+        theta = train_linearReg(X_train, y_train, lambd)
+        train_error[i, :] = linearReg_cost_function(theta, X_train, y_train, lambd)
+        val_error[i, :] = linearReg_cost_function(theta, Xval, yval, lambd)
+    return train_error, val_error
+
+
+def poly_features(X, p):
+    X_poly = np.zeros((X.size, p))
+    for i in range(p):
+        X_poly[:, i] = (X**(i + 1)).T
+    return X_poly
+
+
+def validation_curve(X, y, Xval, yval):
+    lambda_vec = [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1, 3, 10]
+    train_err = np.zeros(len(lambda_vec))
+    val_err = np.zeros(len(lambda_vec))
+
+    for i, lambd in enumerate(lambda_vec):
+        theta = train_linearReg(X, y, lambd)
+        train_err[i] = linearReg_cost_function(theta, X, y, lambd)
+        val_err[i] = linearReg_cost_function(theta, Xval, yval, lambd)
+    return lambda_vec, train_err, val_err
